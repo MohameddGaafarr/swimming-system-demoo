@@ -1,7 +1,18 @@
-export async function normalizeRequestBody(data) {
+function getContentType(headers) {
+  if (!headers) return "";
+  if (typeof headers.get === "function") {
+    return String(headers.get("content-type") ?? headers.get("Content-Type") ?? "");
+  }
+  return String(headers["Content-Type"] ?? headers["content-type"] ?? "");
+}
+
+export async function normalizeRequestBody(data, headers) {
   if (typeof data === "string") {
     const t = data.trim();
+    const ct = getContentType(headers).toLowerCase();
+
     if (
+      ct.includes("application/json") ||
       (t.startsWith("{") && t.endsWith("}")) ||
       (t.startsWith("[") && t.endsWith("]"))
     ) {
@@ -11,6 +22,19 @@ export async function normalizeRequestBody(data) {
         return data;
       }
     }
+
+    if (ct.includes("application/x-www-form-urlencoded") || (/[=]/.test(t) && !t.startsWith("{"))) {
+      try {
+        const out = {};
+        new URLSearchParams(t).forEach((value, key) => {
+          out[key] = value;
+        });
+        if (Object.keys(out).length) return out;
+      } catch {
+        /* fall through */
+      }
+    }
+
     return data;
   }
   if (data instanceof FormData) {

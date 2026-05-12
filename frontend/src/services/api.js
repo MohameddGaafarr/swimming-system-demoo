@@ -1,4 +1,5 @@
 import axios from "axios";
+import { canonicalApiPathFromConfig } from "../demo/demoPath.js";
 import { normalizeRequestBody } from "../demo/formDataUtils.js";
 import { handleDemoRequest } from "../demo/demoStore.js";
 
@@ -6,59 +7,16 @@ function stripQuery(p) {
   return String(p).split("?")[0];
 }
 
-/**
- * Axios may merge `baseURL` (e.g. from Vercel build env) with `url`, or pass a
- * full URL. The demo router only understands paths starting with `/api/`.
- */
-function resolveMockApiPath(config) {
-  const base = String(config?.baseURL ?? "").trim();
-  const rel = String(config?.url ?? "").trim();
-
-  let raw = rel;
-  if (base) {
-    if (/^https?:\/\//i.test(rel)) {
-      raw = rel;
-    } else if (/^https?:\/\//i.test(base)) {
-      const baseUrl = base.endsWith("/") ? base : `${base}/`;
-      const relPath = rel.replace(/^\/+/, "");
-      try {
-        raw = new URL(relPath, baseUrl).href;
-      } catch {
-        raw = `${base.replace(/\/+$/, "")}/${rel.replace(/^\//, "")}`;
-      }
-    } else {
-      raw = `${base.replace(/\/+$/, "")}/${rel.replace(/^\//, "")}`;
-    }
-  }
-
-  raw = stripQuery(raw);
-  if (!raw.startsWith("/") && !/^https?:\/\//i.test(raw)) {
-    raw = `/${raw}`;
-  }
-
-  let pathname = raw;
-  if (/^https?:\/\//i.test(raw)) {
-    try {
-      pathname = new URL(raw).pathname || "/";
-    } catch {
-      pathname = raw;
-    }
-  }
-
-  const idx = pathname.indexOf("/api/");
-  if (idx >= 0) {
-    pathname = pathname.slice(idx);
-  }
-
-  pathname = pathname.replace(/\/+$/, "") || "/";
-  return pathname;
-}
-
 function resolveSuccessStatus(path, method) {
   const clean = stripQuery(path);
-  if (method !== "post") return 200;
-  if (clean === "/api/coaches" || clean === "/api/trainees" || clean === "/api/sessions") return 201;
-  if (clean === "/api/attendance") return 201;
+  const low = String(method || "get").toLowerCase();
+  if (low !== "post") return 200;
+  if (/\/api\/coaches$/.test(clean) || /\/api\/trainees$/.test(clean) || /\/api\/sessions$/.test(clean)) {
+    return 201;
+  }
+  if (/\/api\/attendance$/.test(clean) && !clean.includes("/trainees")) {
+    return 201;
+  }
   return 200;
 }
 
@@ -71,9 +29,17 @@ async function demoAdapter(config) {
   await demoDelay();
 
   const method = String(config.method || "get").toLowerCase();
-  const path = resolveMockApiPath(config);
+  const path = canonicalApiPathFromConfig(config);
+
+  console.info("[SwimaxDemo:adapter]", {
+    method,
+    resolvedPath: path,
+    configUrl: config.url,
+    configBaseURL: config.baseURL,
+  });
+
   const params = config.params && typeof config.params === "object" ? config.params : {};
-  const body = await normalizeRequestBody(config.data);
+  const body = await normalizeRequestBody(config.data, config.headers);
 
   try {
     const data = await handleDemoRequest(method, path, params, body);

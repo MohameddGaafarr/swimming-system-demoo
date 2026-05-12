@@ -1,4 +1,5 @@
 import { DEMO_STORAGE_KEY, SESSION_DAYS, TRAINEE_LEVELS, DEMO_PASSWORD_DEFAULT, DEMO_USERNAME } from "./constants.js";
+import { normalizeRoutePath } from "./demoPath.js";
 import { buildSeedDatabase } from "./seedData.js";
 import { findAllCurrentSessions, findNextUpcomingSession, getCairoContext } from "./cairoSessions.js";
 import {
@@ -343,19 +344,32 @@ function buildTraineeAttendancePopulate(db, row) {
 
 export async function handleDemoRequest(method, urlPath, params = {}, body = null) {
   const db = getDb();
-  const path = String(urlPath).split("?")[0];
+  const path = normalizeRoutePath(urlPath);
+  const m = String(method || "get").toLowerCase();
+
+  const coachIdMatch = path.match(/^\/api\/coaches\/([^/]+)$/);
+  const traineeIdMatch = path.match(/^\/api\/trainees\/([^/]+)$/);
+  const sessionIdMatch = path.match(/^\/api\/sessions\/([^/]+)$/);
 
   /* ---------- AUTH ---------- */
-  if (path === "/api/auth/login" && method === "POST") {
+  if (m === "post" && path.endsWith("/api/auth/login")) {
     const username = String(body?.username ?? "").trim();
     const password = String(body?.password ?? "");
     if (!username || !password) throw httpError(400, "Username and password are required");
     if (username !== DEMO_USERNAME) throw httpError(401, "Invalid username or password");
     if (password !== db.demoPassword) throw httpError(401, "Invalid username or password");
-    return { token: "swimax-demo-session", user: { id: "demo", username: "demo" } };
+    return {
+      token: "demo-token",
+      user: {
+        id: "demo-admin",
+        username: "demo",
+        role: "admin",
+        name: "Demo Admin",
+      },
+    };
   }
 
-  if (path === "/api/auth/change-password" && method === "POST") {
+  if (m === "post" && path.endsWith("/api/auth/change-password")) {
     const { currentPassword, newPassword } = body ?? {};
     if (!currentPassword || !newPassword) {
       throw httpError(400, "currentPassword and newPassword are required");
@@ -372,7 +386,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
   }
 
   /* ---------- COACHES ---------- */
-  if (path === "/api/coaches" && method === "GET") {
+  if (m === "get" && /^\/api\/coaches$/.test(path)) {
     const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
     let limit = parseInt(params.limit ?? "", 10);
     if (!Number.isFinite(limit) || limit <= 0) limit = 500;
@@ -390,8 +404,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     return { coaches: slice, totalItems, totalPages, currentPage };
   }
 
-  const coachIdMatch = path.match(/^\/api\/coaches\/([^/]+)$/);
-  if (coachIdMatch && method === "GET") {
+  if (coachIdMatch && m === "get") {
     const id = coachIdMatch[1];
     const coach = coachById(db, id);
     if (!coach) throw httpError(404, "Coach not found");
@@ -416,7 +429,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     };
   }
 
-  if (path === "/api/coaches" && method === "POST") {
+  if (m === "post" && /^\/api\/coaches$/.test(path)) {
     const parsed = parseCoachPayload(body);
     if (parsed.error) throw httpError(400, parsed.error);
     const doc = {
@@ -432,7 +445,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     return doc;
   }
 
-  if (coachIdMatch && method === "PUT") {
+  if (coachIdMatch && m === "put") {
     const id = coachIdMatch[1];
     const coach = coachById(db, id);
     if (!coach) throw httpError(404, "Coach not found");
@@ -446,7 +459,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     return clone(coach);
   }
 
-  if (coachIdMatch && method === "DELETE") {
+  if (coachIdMatch && m === "delete") {
     const id = coachIdMatch[1];
     const coach = coachById(db, id);
     if (!coach) throw httpError(404, "Coach not found");
@@ -465,7 +478,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
   }
 
   /* ---------- TRAINEES ---------- */
-  if (path === "/api/trainees" && method === "GET") {
+  if (m === "get" && /^\/api\/trainees$/.test(path)) {
     const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
     let limit = parseInt(params.limit ?? "", 10);
     if (!Number.isFinite(limit) || limit <= 0) limit = 500;
@@ -488,8 +501,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     return { trainees: slice, currentPage, totalPages, totalItems };
   }
 
-  const traineeIdMatch = path.match(/^\/api\/trainees\/([^/]+)$/);
-  if (traineeIdMatch && method === "GET") {
+  if (traineeIdMatch && m === "get") {
     const id = traineeIdMatch[1];
     const trainee = traineeById(db, id);
     if (!trainee) throw httpError(404, "Trainee not found");
@@ -518,7 +530,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     };
   }
 
-  if (path === "/api/trainees" && method === "POST") {
+  if (m === "post" && /^\/api\/trainees$/.test(path)) {
     const parsed = parseTraineePayload(body);
     if (parsed.error) throw httpError(400, parsed.error);
     const doc = {
@@ -533,7 +545,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     return populateTraineeWithSession(db, doc);
   }
 
-  if (traineeIdMatch && method === "PUT") {
+  if (traineeIdMatch && m === "put") {
     const id = traineeIdMatch[1];
     const trainee = traineeById(db, id);
     if (!trainee) throw httpError(404, "Trainee not found");
@@ -547,7 +559,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     return populateTraineeWithSession(db, trainee);
   }
 
-  if (traineeIdMatch && method === "DELETE") {
+  if (traineeIdMatch && m === "delete") {
     const id = traineeIdMatch[1];
     const trainee = traineeById(db, id);
     if (!trainee) throw httpError(404, "Trainee not found");
@@ -561,7 +573,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
   }
 
   /* ---------- SESSIONS ---------- */
-  if (path === "/api/sessions/current" && method === "GET") {
+  if (m === "get" && path.endsWith("/api/sessions/current")) {
     const cairoNow = getCairoContext();
     const populated = db.sessions.map((s) => populateSession(db, s));
     const current = findAllCurrentSessions(populated);
@@ -576,7 +588,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     };
   }
 
-  if (path === "/api/sessions/upcoming" && method === "GET") {
+  if (m === "get" && path.endsWith("/api/sessions/upcoming")) {
     const populated = db.sessions.map((s) => populateSession(db, s));
     const currentSessions = findAllCurrentSessions(populated);
     const currentIds = new Set(currentSessions.map((s) => String(s._id)));
@@ -585,7 +597,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     return { upcoming };
   }
 
-  if (path === "/api/sessions" && method === "GET") {
+  if (m === "get" && /^\/api\/sessions$/.test(path)) {
     const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
     const limit = Math.min(500, Math.max(1, parseInt(params.limit ?? "10", 10) || 10));
     const sortBy = params.sortBy;
@@ -602,15 +614,14 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     };
   }
 
-  const sessionIdMatch = path.match(/^\/api\/sessions\/([^/]+)$/);
-  if (sessionIdMatch && method === "GET" && sessionIdMatch[1] !== "clear") {
+  if (sessionIdMatch && m === "get" && sessionIdMatch[1] !== "clear") {
     const id = sessionIdMatch[1];
     const session = sessionById(db, id);
     if (!session) throw httpError(404, "Session not found");
     return populateSession(db, session);
   }
 
-  if (path === "/api/sessions" && method === "POST") {
+  if (m === "post" && /^\/api\/sessions$/.test(path)) {
     const parsed = parseAndValidateSessionBody(db, body);
     if (parsed.error) throw httpError(400, parsed.error);
     const overlap = validateCoachScheduleConflicts(db, parsed.data.coachId, parsed.data.schedule, null);
@@ -628,7 +639,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     return populateSession(db, doc);
   }
 
-  if (sessionIdMatch && method === "PUT") {
+  if (sessionIdMatch && m === "put") {
     const id = sessionIdMatch[1];
     const existing = sessionById(db, id);
     if (!existing) throw httpError(404, "Session not found");
@@ -646,7 +657,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     return populateSession(db, existing);
   }
 
-  if (sessionIdMatch && method === "DELETE" && sessionIdMatch[1] !== "clear") {
+  if (sessionIdMatch && m === "delete" && sessionIdMatch[1] !== "clear") {
     const id = sessionIdMatch[1];
     const existing = sessionById(db, id);
     if (!existing) throw httpError(404, "Session not found");
@@ -660,7 +671,7 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     return { message: "deleted" };
   }
 
-  if (path === "/api/sessions/clear" && method === "DELETE") {
+  if (m === "delete" && path.endsWith("/api/sessions/clear")) {
     db.sessions = [];
     db.trainees.forEach((t) => {
       t.sessionId = null;
@@ -669,8 +680,71 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     return { message: "All sessions cleared" };
   }
 
-  /* ---------- ATTENDANCE ---------- */
-  if (path === "/api/attendance" && method === "GET") {
+  /* ---------- ATTENDANCE (longer paths first) ---------- */
+  if (m === "get" && path.endsWith("/api/attendance/trainees/history")) {
+    return getTraineeAttendanceHistory(db, params);
+  }
+
+  if (m === "get" && path.endsWith("/api/attendance/trainees/by-session")) {
+    const sessionId = String(params.sessionId ?? "").trim();
+    if (!sessionId) throw httpError(400, "Valid sessionId query is required");
+    const date = params.date ? String(params.date).trim() : undefined;
+    const startTime = params.startTime ? normalizeTimeHHMM(params.startTime) : undefined;
+    let rows = db.traineeAttendance.filter((r) => String(r.sessionId) === sessionId);
+    if (date) rows = rows.filter((r) => r.date === date);
+    if (startTime) rows = rows.filter((r) => normalizeTimeHHMM(r.startTime) === startTime);
+    rows.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.startTime).localeCompare(String(a.startTime)));
+    return {
+      sessionId,
+      records: rows.map((r) => buildTraineeAttendancePopulate(db, r)),
+    };
+  }
+
+  if (m === "get" && path.endsWith("/api/attendance/history")) {
+    return getCoachAttendanceHistory(db, params);
+  }
+
+  if (m === "get" && path.endsWith("/api/attendance/payroll-summary")) {
+    return getPayrollSummary(db, params);
+  }
+
+  if (m === "delete" && path.endsWith("/api/attendance/clear/coaches")) {
+    db.coachAttendance = [];
+    db.coaches.forEach((c) => {
+      c.totalWorkingHours = 0;
+    });
+    persist();
+    return { message: "Coach attendance cleared successfully" };
+  }
+
+  if (m === "delete" && path.endsWith("/api/attendance/clear/trainees")) {
+    db.traineeAttendance = [];
+    persist();
+    return { message: "Trainee attendance cleared successfully" };
+  }
+
+  if (m === "get" && /^\/api\/attendance\/trainees$/.test(path)) {
+    const dateOnly = params.date ? String(params.date).trim() : getCairoDateOnly();
+    if (!isValidDateOnly(dateOnly)) throw httpError(400, "date query must be in YYYY-MM-DD format");
+    const records = db.traineeAttendance.filter((r) => r.date === dateOnly);
+    const items = records.map((r) => buildTraineeAttendancePopulate(db, r));
+    const statusByKey = {};
+    items.forEach((record) => {
+      const tid = record.traineeId?._id ?? record.traineeId;
+      const sid = record.sessionId?._id ?? record.sessionId;
+      const key = `${String(tid)}|${String(sid)}|${dateOnly}|${normalizeTimeHHMM(record.startTime) ?? record.startTime}`;
+      const attendedValue = record.attended === false ? false : true;
+      const storedReason = record.reason ?? record.note ?? "";
+      statusByKey[key] = { attended: attendedValue, note: storedReason, reason: storedReason };
+    });
+    return { date: dateOnly, items, statusByKey };
+  }
+
+  if (m === "post" && /^\/api\/attendance\/trainees$/.test(path)) {
+    return markTraineeAttendance(db, body);
+  }
+
+  if (m === "get" && /^\/api\/attendance$/.test(path)) {
     const dateOnly = params.date ? String(params.date).trim() : getCairoDateOnly();
     if (!isValidDateOnly(dateOnly)) throw httpError(400, "date query must be in YYYY-MM-DD format");
     const records = db.coachAttendance.filter((r) => r.date === dateOnly);
@@ -689,73 +763,15 @@ export async function handleDemoRequest(method, urlPath, params = {}, body = nul
     return { date: dateOnly, items, markedKeys, statusByKey };
   }
 
-  if (path === "/api/attendance/history" && method === "GET") {
-    return getCoachAttendanceHistory(db, params);
-  }
-
-  if (path === "/api/attendance/payroll-summary" && method === "GET") {
-    return getPayrollSummary(db, params);
-  }
-
-  if (path === "/api/attendance" && method === "POST") {
+  if (m === "post" && /^\/api\/attendance$/.test(path)) {
     return markCoachAttendance(db, body);
   }
 
-  if (path === "/api/attendance/clear/coaches" && method === "DELETE") {
-    db.coachAttendance = [];
-    db.coaches.forEach((c) => {
-      c.totalWorkingHours = 0;
-    });
-    persist();
-    return { message: "Coach attendance cleared successfully" };
-  }
-
-  if (path === "/api/attendance/trainees" && method === "GET") {
-    const dateOnly = params.date ? String(params.date).trim() : getCairoDateOnly();
-    if (!isValidDateOnly(dateOnly)) throw httpError(400, "date query must be in YYYY-MM-DD format");
-    const records = db.traineeAttendance.filter((r) => r.date === dateOnly);
-    const items = records.map((r) => buildTraineeAttendancePopulate(db, r));
-    const statusByKey = {};
-    items.forEach((record) => {
-      const tid = record.traineeId?._id ?? record.traineeId;
-      const sid = record.sessionId?._id ?? record.sessionId;
-      const key = `${String(tid)}|${String(sid)}|${dateOnly}|${normalizeTimeHHMM(record.startTime) ?? record.startTime}`;
-      const attendedValue = record.attended === false ? false : true;
-      const storedReason = record.reason ?? record.note ?? "";
-      statusByKey[key] = { attended: attendedValue, note: storedReason, reason: storedReason };
-    });
-    return { date: dateOnly, items, statusByKey };
-  }
-
-  if (path === "/api/attendance/trainees/history" && method === "GET") {
-    return getTraineeAttendanceHistory(db, params);
-  }
-
-  if (path === "/api/attendance/trainees/by-session" && method === "GET") {
-    const sessionId = String(params.sessionId ?? "").trim();
-    if (!sessionId) throw httpError(400, "Valid sessionId query is required");
-    const date = params.date ? String(params.date).trim() : undefined;
-    const startTime = params.startTime ? normalizeTimeHHMM(params.startTime) : undefined;
-    let rows = db.traineeAttendance.filter((r) => String(r.sessionId) === sessionId);
-    if (date) rows = rows.filter((r) => r.date === date);
-    if (startTime) rows = rows.filter((r) => normalizeTimeHHMM(r.startTime) === startTime);
-    rows.sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.startTime).localeCompare(String(a.startTime)));
-    return {
-      sessionId,
-      records: rows.map((r) => buildTraineeAttendancePopulate(db, r)),
-    };
-  }
-
-  if (path === "/api/attendance/trainees" && method === "POST") {
-    return markTraineeAttendance(db, body);
-  }
-
-  if (path === "/api/attendance/clear/trainees" && method === "DELETE") {
-    db.traineeAttendance = [];
-    persist();
-    return { message: "Trainee attendance cleared successfully" };
-  }
-
+  console.error("[SwimaxDemo:router] unmatched mock route", {
+    method: m,
+    path,
+    rawUrlPath: urlPath,
+  });
   throw httpError(404, "Not found");
 }
 
