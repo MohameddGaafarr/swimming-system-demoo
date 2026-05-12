@@ -6,6 +6,54 @@ function stripQuery(p) {
   return String(p).split("?")[0];
 }
 
+/**
+ * Axios may merge `baseURL` (e.g. from Vercel build env) with `url`, or pass a
+ * full URL. The demo router only understands paths starting with `/api/`.
+ */
+function resolveMockApiPath(config) {
+  const base = String(config?.baseURL ?? "").trim();
+  const rel = String(config?.url ?? "").trim();
+
+  let raw = rel;
+  if (base) {
+    if (/^https?:\/\//i.test(rel)) {
+      raw = rel;
+    } else if (/^https?:\/\//i.test(base)) {
+      const baseUrl = base.endsWith("/") ? base : `${base}/`;
+      const relPath = rel.replace(/^\/+/, "");
+      try {
+        raw = new URL(relPath, baseUrl).href;
+      } catch {
+        raw = `${base.replace(/\/+$/, "")}/${rel.replace(/^\//, "")}`;
+      }
+    } else {
+      raw = `${base.replace(/\/+$/, "")}/${rel.replace(/^\//, "")}`;
+    }
+  }
+
+  raw = stripQuery(raw);
+  if (!raw.startsWith("/") && !/^https?:\/\//i.test(raw)) {
+    raw = `/${raw}`;
+  }
+
+  let pathname = raw;
+  if (/^https?:\/\//i.test(raw)) {
+    try {
+      pathname = new URL(raw).pathname || "/";
+    } catch {
+      pathname = raw;
+    }
+  }
+
+  const idx = pathname.indexOf("/api/");
+  if (idx >= 0) {
+    pathname = pathname.slice(idx);
+  }
+
+  pathname = pathname.replace(/\/+$/, "") || "/";
+  return pathname;
+}
+
 function resolveSuccessStatus(path, method) {
   const clean = stripQuery(path);
   if (method !== "post") return 200;
@@ -23,9 +71,7 @@ async function demoAdapter(config) {
   await demoDelay();
 
   const method = String(config.method || "get").toLowerCase();
-  const base = String(config.baseURL ?? "").replace(/\/+$/, "");
-  const rel = String(config.url ?? "");
-  const path = stripQuery(base ? `${base}${rel}` : rel);
+  const path = resolveMockApiPath(config);
   const params = config.params && typeof config.params === "object" ? config.params : {};
   const body = await normalizeRequestBody(config.data);
 
@@ -58,9 +104,11 @@ async function demoAdapter(config) {
 
 const api = axios.create({
   adapter: demoAdapter,
+  baseURL: "",
 });
 
 api.interceptors.request.use((config) => {
+  config.baseURL = "";
   const token = localStorage.getItem("token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

@@ -1,4 +1,18 @@
 export async function normalizeRequestBody(data) {
+  if (typeof data === "string") {
+    const t = data.trim();
+    if (
+      (t.startsWith("{") && t.endsWith("}")) ||
+      (t.startsWith("[") && t.endsWith("]"))
+    ) {
+      try {
+        return JSON.parse(t);
+      } catch {
+        return data;
+      }
+    }
+    return data;
+  }
   if (data instanceof FormData) {
     const out = {};
     for (const [key, value] of data.entries()) {
