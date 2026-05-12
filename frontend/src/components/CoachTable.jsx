@@ -182,10 +182,10 @@ export default function CoachTable({
 
                   {/* Actions */}
                   <td className="px-5 py-4">
-                    <div className="flex flex-col items-end gap-2">
+                    <div className="flex flex-col items-end gap-2 md:flex-row md:items-center md:justify-end">
                       <Link
                         to={`/coaches/${c._id}`}
-                        className="w-24 text-center rounded-xl border border-sky-500/35 bg-sky-500/10 px-3 py-2 text-xs font-medium text-sky-200 transition duration-200 hover:scale-[1.02] hover:border-sky-400/60 hover:bg-sky-500/20"
+                        className="w-24 md:w-20 text-center rounded-xl border border-sky-500/35 bg-sky-500/10 px-3 py-2 text-xs font-medium text-sky-200 transition duration-200 hover:scale-[1.02] hover:border-sky-400/60 hover:bg-sky-500/20"
                       >
                         Profile
                       </Link>
@@ -193,7 +193,7 @@ export default function CoachTable({
                       <button
                         type="button"
                         onClick={() => onEdit(c)}
-                        className="w-24 rounded-xl border border-slate-600 px-3 py-2 text-xs font-medium text-slate-200 transition duration-200 hover:border-slate-500 hover:bg-slate-800/80"
+                        className="w-24 md:w-20 rounded-xl border border-slate-600 px-3 py-2 text-xs font-medium text-slate-200 transition duration-200 hover:border-slate-500 hover:bg-slate-800/80"
                       >
                         Edit
                       </button>
@@ -201,7 +201,7 @@ export default function CoachTable({
                       <button
                         type="button"
                         onClick={() => onDelete(c)}
-                        className="w-24 rounded-xl border border-red-500/40 bg-red-950/40 px-3 py-2 text-xs font-medium text-red-200 transition duration-200 hover:bg-red-950/60"
+                        className="w-24 md:w-20 rounded-xl border border-red-500/40 bg-red-950/40 px-3 py-2 text-xs font-medium text-red-200 transition duration-200 hover:bg-red-950/60"
                       >
                         Delete
                       </button>
