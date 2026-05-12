@@ -171,10 +171,10 @@ export default function SessionTable({
                 </td>
 
                 <td className="px-5 py-4">
-                  <div className="flex flex-col items-end gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:justify-end sm:items-center">
                     <Link
                       to={`/sessions/${session._id}`}
-                      className="w-24 text-center rounded-xl border border-sky-500/35 bg-sky-500/10 px-3 py-2 text-xs font-medium text-sky-200 transition duration-200 hover:scale-[1.02] hover:border-sky-400/60 hover:bg-sky-500/20"
+                      className="rounded-xl border border-sky-500/35 bg-sky-500/10 px-3 py-1.5 text-center text-xs font-medium text-sky-200 transition duration-200 hover:scale-[1.02] hover:border-sky-400/60 hover:bg-sky-500/20"
                     >
                       Details
                     </Link>
@@ -182,7 +182,7 @@ export default function SessionTable({
                     <button
                       type="button"
                       onClick={() => onEdit(session)}
-                      className="w-24 rounded-xl border border-slate-600 px-3 py-2 text-xs font-medium text-slate-200 transition duration-200 hover:border-slate-500 hover:bg-slate-800/80"
+                      className="rounded-xl border border-slate-600 px-3 py-1.5 text-xs font-medium text-slate-200 transition duration-200 hover:border-slate-500 hover:bg-slate-800/80"
                     >
                       Edit
                     </button>
@@ -190,7 +190,7 @@ export default function SessionTable({
                     <button
                       type="button"
                       onClick={() => onDelete(session)}
-                      className="w-24 rounded-xl border border-red-500/40 bg-red-950/40 px-3 py-2 text-xs font-medium text-red-200 transition duration-200 hover:bg-red-950/60"
+                      className="rounded-xl border border-red-500/40 bg-red-950/40 px-3 py-1.5 text-xs font-medium text-red-200 transition duration-200 hover:bg-red-950/60"
                     >
                       Delete
                     </button>
